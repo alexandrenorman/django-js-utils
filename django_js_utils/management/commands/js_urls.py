@@ -4,8 +4,10 @@ from django.core.exceptions import ImproperlyConfigured
 
 from django.core.urlresolvers import RegexURLPattern, RegexURLResolver
 from django.core.management.base import BaseCommand
-from django.utils import simplejson
-from django.utils.datastructures import SortedDict
+# from django.utils import simplejson
+import json as simplejson
+# from django.utils.datastructures import SortedDict
+from collections import OrderedDict as SortedDict
 from django.conf import settings
 
 
@@ -25,13 +27,13 @@ class Command(BaseCommand):
             raise ImproperlyConfigured('You should provide URLS_JS_GENERATED_FILE setting.')
 
         js_patterns = SortedDict()
-        print "Generating Javascript urls file %s" % URLS_JS_GENERATED_FILE
+        print("Generating Javascript urls file %s" % URLS_JS_GENERATED_FILE)
         Command.handle_url_module(js_patterns, settings.ROOT_URLCONF)
         #output to the file
         urls_file = open(URLS_JS_GENERATED_FILE, "w")
         urls_file.write("dutils.conf.urls = ")
         simplejson.dump(js_patterns, urls_file)
-        print "Done generating Javascript urls file %s" % URLS_JS_GENERATED_FILE
+        print("Done generating Javascript urls file %s" % URLS_JS_GENERATED_FILE)
     
     @staticmethod
     def handle_url_module(js_patterns, module_name, prefix=""):
@@ -39,7 +41,7 @@ class Command(BaseCommand):
         Load the module and output all of the patterns
         Recurse on the included modules
         """
-        if isinstance(module_name, basestring):
+        if isinstance(module_name, str):
             __import__(module_name)
             root_urls = sys.modules[module_name]
             patterns = root_urls.urlpatterns
@@ -47,10 +49,15 @@ class Command(BaseCommand):
             root_urls = module_name
             patterns = root_urls
 
+        if not isinstance(patterns, list):
+            return
+
         for pattern in patterns:
             if issubclass(pattern.__class__, RegexURLPattern):
                 if pattern.name:
                     full_url = prefix + pattern.regex.pattern
+                    # Fix django-rest-framework addition
+                    full_url = full_url.replace('\\.(?P<format>[a-z0-9]+)/?', '/')
                     for chr in ["^","$"]:
                         full_url = full_url.replace(chr, "")
                     #handle kwargs, args
